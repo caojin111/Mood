@@ -1,0 +1,275 @@
+Mood Journal for Seniors - iOS开发文档
+1. 项目概述
+1.1 应用信息
+应用名称: Mood Journal for Seniors
+目标平台: iOS (iPhone & iPad)
+最低支持版本: iOS 16.0+
+开发语言: Swift
+架构模式: MVVM + Coordinator
+竞品参考: Daylio
+1.2 核心功能
+心情日记记录与管理
+数据统计与分析
+心情图片皮肤商店系统
+用户设置管理
+订阅制付费系统
+2. 技术架构
+2.1 项目结构
+MoodJournalForSeniors/
+├── App/
+│   ├── AppDelegate.swift
+│   ├── SceneDelegate.swift
+│   └── Info.plist
+├── Core/
+│   ├── Models/
+│   ├── Services/
+│   ├── Utilities/
+│   └── Extensions/
+├── Features/
+│   ├── Onboarding/
+│   ├── Home/
+│   ├── Statistics/
+│   ├── Store/
+│   └── Settings/
+├── Resources/
+│   ├── Assets.xcassets
+│   ├── Localizable.strings
+│   └── LaunchScreen.storyboard
+└── Supporting Files/
+2.2 核心依赖
+UIKit: 主要UI框架
+CoreData: 本地数据存储
+AVFoundation: 音频录制播放
+StoreKit: 内购和订阅
+CloudKit: 家庭共享功能
+UserNotifications: 推送提醒
+Photos: 图片处理
+Charts: 数据可视化图表
+3. 数据模型设计
+3.1 核心数据模型
+// 心情日记模型
+struct MoodEntry {
+    let id: UUID
+    let date: Date
+    let moodLevel: Int // 1-5
+    let activities: [Activity]
+    let note: String?
+    let audioURL: URL?
+    let imageURL: URL?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+// 活动模型
+struct Activity {
+    let id: UUID
+    let name: String
+    let category: ActivityCategory
+    let isCustom: Bool
+}
+
+// 用户配置模型
+struct UserProfile {
+    let id: UUID
+    let gender: Gender
+    let birthday: Date
+    let selectedMoodSkinPack: String? // 当前使用的心情图片皮肤包ID
+    let preferredColorScheme: ColorScheme
+    let interestedCategories: [Category]
+    let ownedMoodSkinPacks: [String] // 用户拥有的心情皮肤包ID列表
+    let isPremium: Bool
+    let subscriptionType: SubscriptionType?
+}
+3.2 数据存储策略
+本地存储: 使用CoreData存储用户数据和日记
+云同步: 通过CloudKit实现跨设备同步
+图片存储: 本地Documents目录 + iCloud备份
+音频存储: 本地Documents目录 + 压缩优化
+4. 功能模块详细设计
+4.1 Onboarding流程
+4.1.1 问卷调查页面
+enum OnboardingStep: Int, CaseIterable {
+    case welcome = 0
+    case gender
+    case moodSkinSelection
+    case colorScheme
+    case interests
+    case birthday
+    case healthReminder
+    case pushNotification
+    case paywall
+}
+4.1.2 实现要点
+使用UIPageViewController实现流畅切换
+每步数据本地缓存，支持前进后退
+适老化设计：大字体、高对比度、简洁布局
+支持VoiceOver无障碍访问
+4.2 主界面 (首页)
+4.2.1 日记列表视图
+class HomeViewController: UIViewController {
+    @IBOutlet weak var collectionView: UICollectionView!
+    @IBOutlet weak var viewModeSegmentedControl: UISegmentedControl!
+    @IBOutlet weak var addButton: UIButton!
+
+    enum ViewMode {
+        case list
+        case calendar
+    }
+}
+4.2.2 功能实现
+列表模式: 使用UICollectionView展示时间线
+日历模式: 自定义日历组件，显示心情标记
+添加按钮: 悬浮在底部中央，支持触觉反馈
+编辑/删除: 长按手势 + 上下文菜单
+4.3 新增日记流程
+4.3.1 分步骤界面
+enum AddEntryStep: Int, CaseIterable {
+    case moodSelection = 0
+    case activitySelection
+    case noteWriting
+    case audioRecording
+    case photoUpload
+    case preview
+}
+4.3.2 技术要点
+心情选择: 自定义动画按钮，显示用户选择的心情图片皮肤
+活动选择: 多选标签云，支持自定义添加
+文字记录: UITextView支持自动高度调整
+录音功能: AVAudioRecorder + 波形可视化
+图片上传: 相册选择 + 相机拍摄，自动压缩
+4.4 数据统计页面
+4.4.1 图表组件
+class StatisticsViewController: UIViewController {
+    @IBOutlet weak var moodTrendChart: LineChartView!
+    @IBOutlet weak var moodCountChart: PieChartView!
+    @IBOutlet weak var averageMoodLabel: UILabel!
+    @IBOutlet weak var stabilityIndicator: UIProgressView!
+    @IBOutlet weak var correlationTableView: UITableView!
+}
+4.4.2 付费功能控制
+免费用户：基础折线图、数量统计
+付费用户：平均心情、稳定性分析、深度关联分析
+使用guard语句检查订阅状态
+4.5 皮肤商店
+4.5.1 商店架构
+struct MoodSkinPack {
+    let id: String
+    let name: String
+    let description: String
+    let moodImages: [Int: UIImage] // 键为心情等级(1-5)，值为对应图片
+    let previewImage: UIImage // 商店展示缩略图
+    let category: String // 如"动物"、"表情"、"自然"等
+    let isPremium: Bool
+    let price: String?
+    let isOwned: Bool
+}
+4.5.2 实现细节
+网格布局展示心情图片皮肤包
+预览功能：显示五个心情等级的完整图片预览
+购买流程：集成StoreKit处理订阅验证
+下载管理：皮肤资源按需下载
+应用逻辑：用户选择心情时显示对应皮肤包的图片
+4.6 设置页面 ("更多")
+4.6.1 功能列表
+enum SettingsItem: CaseIterable {
+    case photoGallery
+    case familySharing
+    case dataExport
+    case supportUs
+    case reminderSettings
+    case hapticSettings
+    case appIconChange
+}
+5. 订阅系统实现
+5.1 产品配置
+enum SubscriptionProduct: String, CaseIterable {
+    case monthly = "mood_journal_monthly_4_99"
+    case yearly = "mood_journal_yearly_35_99"  
+    case lifetime = "mood_journal_lifetime_59_99"
+
+    var localizedPrice: String { ... }
+    var trialPeriod: Int? { ... }
+}
+5.2 实现要点
+StoreKit 2: 使用最新API处理订阅
+收据验证: 服务器端验证 + 本地缓存
+试用期: 7天免费试用逻辑
+恢复购买: 支持跨设备恢复
+支付墙: 多个入口点，A/B测试支持
+6. 推送通知
+6.1 通知类型
+enum NotificationType: String {
+    case dailyReminder = "daily_reminder"
+    case weeklyReview = "weekly_review"
+    case healthTip = "health_tip"
+}
+6.2 实现策略
+本地通知: 日常提醒使用本地通知
+富媒体: 支持图片、音频通知
+个性化: 根据用户习惯调整提醒时间
+设置界面: 细粒度控制通知类型和时间
+7. 数据安全与隐私
+7.1 数据加密
+敏感数据: 使用Keychain存储加密密钥
+本地数据: CoreData启用加密
+传输数据: HTTPS + Certificate Pinning
+7.2 隐私保护
+最小权限: 按需申请相机、麦克风、照片权限
+透明度: 详细的隐私政策说明
+用户控制: 支持数据导出和删除
+8. 性能优化
+8.1 启动优化
+懒加载: 非关键模块延迟初始化
+预缓存: 常用皮肤和图标预加载
+异步处理: 数据库操作使用后台队列
+8.2 内存管理
+图片优化: 自动压缩和缓存策略
+音频处理: 流式播放大文件
+数据分页: 日记列表支持分页加载
+9. 测试策略
+9.1 单元测试
+Model层: 数据模型和业务逻辑测试
+Service层: 网络请求和数据处理测试
+Utility: 工具类和扩展方法测试
+9.2 UI测试
+关键流程: Onboarding、添加日记、购买流程
+无障碍: VoiceOver和大字体测试
+设备适配: 不同屏幕尺寸测试
+10. 发布准备
+10.1 App Store配置
+元数据: 多语言描述和关键词优化
+截图: 针对老年人群体的展示图
+审核准备: 演示账号和测试数据
+10.2 监控埋点
+崩溃监控: 集成Crashlytics
+行为分析: 关键操作埋点
+性能监控: 启动时间、内存使用监控
+11. 开发里程碑
+Phase 1 (4周)
+基础架构搭建
+Onboarding流程
+基础日记功能
+Phase 2 (3周)
+数据统计页面
+订阅系统集成
+皮肤商店基础功能
+Phase 3 (3周)
+设置页面完善
+推送通知系统
+家庭共享功能
+Phase 4 (2周)
+性能优化
+测试完善
+发布准备
+12. 注意事项
+12.1 适老化设计原则
+大字体: 默认使用较大字号，支持动态字体
+高对比度: 确保足够的颜色对比度
+简洁界面: 避免复杂操作，突出主要功能
+容错性: 提供撤销功能，防止误操作
+12.2 开发规范
+代码注释: 关键逻辑添加中文注释
+日志记录: 主要功能添加详细日志
+错误处理: 友好的错误提示信息
+版本兼容: 向后兼容数据格式
+本文档将随着开发进度持续更新，请开发团队及时同步最新版本。
