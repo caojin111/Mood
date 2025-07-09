@@ -1,32 +1,54 @@
 import SwiftUI
 import UserNotifications
 
-// MARK: - 欢迎页面
+// MARK: - 欢迎页面（Splash页面）
 struct WelcomeStepView: View {
+    @EnvironmentObject var onboardingData: OnboardingData
+    
     var body: some View {
-        OnboardingStepContainer(step: .welcome) {
-            VStack(spacing: AppTheme.Spacing.xl) {
-                // 欢迎图标
-                Image(systemName: "heart.fill")
-                    .font(.system(size: 80))
-                    .foregroundColor(AppTheme.Colors.primary)
+        // 全屏的可点击区域
+        GeometryReader { geometry in
+            ZStack {
+                // 背景
+                AppTheme.Colors.background
+                    .ignoresSafeArea()
                 
-                VStack(spacing: AppTheme.Spacing.lg) {
-                    Text("专为老年人设计的")
+                VStack(spacing: AppTheme.Spacing.xl) {
+                    Spacer()
+                    
+                    // APP Logo （用临时图替代）
+                    Image(systemName: "heart.circle.fill")
+                        .font(.system(size: 120))
+                        .foregroundColor(AppTheme.Colors.primary)
+                        .padding(.bottom, AppTheme.Spacing.md)
+                    
+                    // APP 标题
+                    Text("心情日记")
+                        .font(AppTheme.Fonts.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(AppTheme.Colors.textPrimary)
+                        .padding(.bottom, AppTheme.Spacing.lg)
+                    
+                    // 开发者名字
+                    Text("Made by LazyCat")
                         .font(AppTheme.Fonts.headline)
                         .foregroundColor(AppTheme.Colors.textSecondary)
-                    
-                    Text("简单易用的心情记录工具")
-                        .font(AppTheme.Fonts.title2)
-                        .foregroundColor(AppTheme.Colors.textPrimary)
                         .fontWeight(.medium)
                     
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
-                        FeatureRow(icon: "pencil.circle.fill", title: "轻松记录", description: "简单记录每天的心情和活动")
-                        FeatureRow(icon: "chart.line.uptrend.xyaxis.circle.fill", title: "数据分析", description: "了解心情变化趋势")
-                        FeatureRow(icon: "heart.circle.fill", title: "健康提醒", description: "定时提醒关注心理健康")
-                    }
+                    Spacer()
+                    
+                    // 提示文本
+                    Text("轻触屏幕开始")
+                        .font(AppTheme.Fonts.callout)
+                        .foregroundColor(AppTheme.Colors.textSecondary)
+                        .opacity(0.8)
+                        .padding(.bottom, AppTheme.Spacing.xl)
                 }
+            }
+            .contentShape(Rectangle()) // 让整个区域都可以点击
+            .onTapGesture {
+                print("🎯 Splash页面被点击，跳转到下一步")
+                onboardingData.moveToNext()
             }
         }
     }

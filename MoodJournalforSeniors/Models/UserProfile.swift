@@ -116,6 +116,10 @@ struct UserProfile: Identifiable, Codable {
     var enableWeeklyReview: Bool
     var enableHealthTips: Bool
     
+    // 触感反馈设置
+    var enableHapticFeedback: Bool
+    var hapticIntensity: Double // 0.0 - 1.0
+    
     init(gender: Gender? = nil,
          birthday: Date? = nil,
          preferredMoodStyle: MoodStyle = .emoji,
@@ -142,6 +146,10 @@ struct UserProfile: Identifiable, Codable {
         self.dailyReminderTime = Calendar.current.date(bySettingHour: 20, minute: 0, second: 0, of: Date()) ?? Date()
         self.enableWeeklyReview = true
         self.enableHealthTips = true
+        
+        // 默认触感设置
+        self.enableHapticFeedback = true
+        self.hapticIntensity = 0.8
         
         print("👤 创建用户配置: 心情风格 \(preferredMoodStyle.rawValue), 颜色主题 \(preferredColorScheme)")
     }

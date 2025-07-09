@@ -1,0 +1,23 @@
+=== 需要添加的隐私权限配置 ===
+
+1. Privacy - Microphone Usage Description
+   类型: String
+   值: 心情日记需要使用麦克风来录制语音备注，帮助您更好地记录和表达情感
+
+2. Privacy - Camera Usage Description  
+   类型: String
+   值: 心情日记需要使用相机来拍摄照片，记录生活中的美好瞬间和心情
+
+3. Privacy - Photo Library Usage Description
+   类型: String
+   值: 心情日记需要访问照片库来选择照片，为您的心情记录增添视觉元素
+
+=== 配置步骤 ===
+1. 在 Xcode 项目设置 > Info 标签页
+2. 在 Custom iOS Target Properties 中点击 + 按钮
+3. 输入上述 Key 名称，类型选择 String，输入对应的值
+4. 保存并重新构建项目
+
+=== 验证方法 ===
+- 构建成功且无错误
+- 运行应用时权限请求正常显示

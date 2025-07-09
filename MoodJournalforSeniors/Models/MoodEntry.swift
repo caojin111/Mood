@@ -31,6 +31,27 @@ struct MoodEntry: Identifiable, Codable {
         print("📝 创建新的心情日记: 心情等级 \(moodLevel)")
     }
     
+    // 编辑现有心情日记的初始化方法
+    init(existingEntry: MoodEntry,
+         date: Date,
+         moodLevel: Int,
+         activities: [Activity],
+         note: String? = nil,
+         audioURL: URL? = nil,
+         imageURL: URL? = nil) {
+        self.id = existingEntry.id
+        self.date = date
+        self.moodLevel = moodLevel
+        self.activities = activities
+        self.note = note
+        self.audioURL = audioURL
+        self.imageURL = imageURL
+        self.createdAt = existingEntry.createdAt // 保持原创建时间
+        self.updatedAt = Date() // 更新修改时间
+        
+        print("✏️ 编辑心情日记: \(existingEntry.id) -> 心情等级 \(moodLevel)")
+    }
+    
     // 心情描述
     var moodDescription: String {
         switch moodLevel {
@@ -53,5 +74,10 @@ struct MoodEntry: Identifiable, Codable {
         case 5: return "mood_very_good"    // 深一点的墨绿色
         default: return "mood_neutral"
         }
+    }
+    
+    // 是否包含媒体文件
+    var hasMedia: Bool {
+        return audioURL != nil || imageURL != nil
     }
 } 

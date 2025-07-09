@@ -9,6 +9,10 @@ struct AddMoodEntryView: View {
     @State private var selectedActivities: Set<Activity> = []
     @State private var noteText: String = ""
     @State private var selectedDate = Date()
+    @State private var showingCustomActivityCreation = false
+    @State private var showingActivityLimitAlert = false
+    @State private var selectedAudioURL: URL?
+    @State private var selectedImage: UIImage?
     
     var body: some View {
         NavigationView {
@@ -26,24 +30,36 @@ struct AddMoodEntryView: View {
                     // 备注输入
                     noteInputSection
                     
+                    // 语音录制
+                    voiceRecordingSection
+                    
+                    // 照片选择
+                    photoSelectionSection
+                    
                     // 保存按钮
                     saveButton
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.sm) // 减少垂直边距
-            }
-            .background(AppTheme.Colors.background)
-            .navigationTitle("记录心情")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("取消") {
-                        presentationMode.wrappedValue.dismiss()
-                        print("❌ 取消添加心情日记")
                     }
-                    .foregroundColor(AppTheme.Colors.textSecondary)
+        .background(AppTheme.Colors.background)
+        .navigationTitle("记录心情")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button("取消") {
+                    presentationMode.wrappedValue.dismiss()
+                    print("❌ 取消添加心情日记")
                 }
+                .foregroundColor(AppTheme.Colors.textSecondary)
             }
+        }
+        .onAppear {
+            // 调试：检查自定义活动状态
+            dataManager.debugCustomActivities()
+            dataManager.checkActivityDisplayStatus()
+            print("📱 AddMoodEntryView 出现，当前显示的活动: \(getPreferredActivities().map { $0.name })")
+        }
         }
     }
     
@@ -116,7 +132,8 @@ struct AddMoodEntryView: View {
                 columns: Array(repeating: GridItem(.flexible(), spacing: AppTheme.Spacing.xs), count: 2), 
                 spacing: AppTheme.Spacing.sm
             ) {
-                ForEach(dataManager.getAllActivities().prefix(8), id: \.id) { activity in
+                // 显示优选的活动（确保包含"阅读"和自定义活动）
+                ForEach(getPreferredActivities(), id: \.id) { activity in
                     ActivityTagView(
                         activity: activity,
                         isSelected: selectedActivities.contains(activity)
@@ -124,10 +141,27 @@ struct AddMoodEntryView: View {
                         toggleActivity(activity)
                     }
                 }
+                
+                // 新建活动按钮
+                NewActivityButton(isDisabled: hasReachedActivityLimit()) {
+                    handleNewActivityButtonTap()
+                }
             }
+            .animation(.easeInOut(duration: 0.3), value: dataManager.customActivities.count)
         }
         .padding(AppTheme.Spacing.cardPadding)
         .cardStyle()
+        .sheet(isPresented: $showingCustomActivityCreation) {
+            CustomActivityCreationView()
+                .environmentObject(dataManager)
+        }
+        .alert("提示", isPresented: $showingActivityLimitAlert) {
+            Button("确定") {
+                showingActivityLimitAlert = false
+            }
+        } message: {
+            Text("活动数已达到上限！")
+        }
     }
     
     // 日期选择区域
@@ -177,6 +211,40 @@ struct AddMoodEntryView: View {
         .cardStyle()
     }
     
+    // 语音录制区域
+    private var voiceRecordingSection: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("添加语音")
+                .font(AppTheme.Fonts.title2)
+                .foregroundColor(AppTheme.Colors.textPrimary)
+            
+            Text("录制语音备忘，留下珍贵的声音回忆")
+                .font(AppTheme.Fonts.callout)
+                .foregroundColor(AppTheme.Colors.textSecondary)
+            
+            VoiceRecorderView(audioURL: $selectedAudioURL)
+        }
+        .padding(AppTheme.Spacing.cardPadding)
+        .cardStyle()
+    }
+    
+    // 照片选择区域
+    private var photoSelectionSection: some View {
+        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+            Text("添加照片")
+                .font(AppTheme.Fonts.title2)
+                .foregroundColor(AppTheme.Colors.textPrimary)
+            
+            Text("记录美好瞬间，为心情增添色彩")
+                .font(AppTheme.Fonts.callout)
+                .foregroundColor(AppTheme.Colors.textSecondary)
+            
+            PhotoSelectorView(selectedImage: $selectedImage)
+        }
+        .padding(AppTheme.Spacing.cardPadding)
+        .cardStyle()
+    }
+    
     // 保存按钮
     private var saveButton: some View {
         Button(action: saveMoodEntry) {
@@ -221,62 +289,101 @@ struct AddMoodEntryView: View {
     }
     
     private func saveMoodEntry() {
+        var imageURL: URL?
+        
+        // 处理图片保存
+        if let image = selectedImage {
+            imageURL = dataManager.saveImage(image)
+            if imageURL == nil {
+                print("❌ 图片保存失败")
+                return
+            }
+        }
+        
         let entry = MoodEntry(
             date: selectedDate,
             moodLevel: selectedMood,
             activities: Array(selectedActivities),
-            note: noteText.isEmpty ? nil : noteText
+            note: noteText.isEmpty ? nil : noteText,
+            audioURL: selectedAudioURL,
+            imageURL: imageURL
         )
         
         dataManager.addMoodEntry(entry)
         presentationMode.wrappedValue.dismiss()
         
-        print("💾 保存心情日记成功: \(entry.moodDescription)")
+        let mediaInfo = buildMediaInfo()
+        print("💾 保存心情日记成功: \(entry.moodDescription)\(mediaInfo)")
+    }
+    
+    private func buildMediaInfo() -> String {
+        var info = ""
+        if selectedAudioURL != nil {
+            info += "，包含语音"
+        }
+        if selectedImage != nil {
+            info += "，包含照片"
+        }
+        return info
+    }
+    
+    // 检查活动数量是否已达上限
+    private func hasReachedActivityLimit() -> Bool {
+        return getPreferredActivities().count >= 19
+    }
+    
+    // 处理新建活动按钮点击
+    private func handleNewActivityButtonTap() {
+        if hasReachedActivityLimit() {
+            showingActivityLimitAlert = true
+            print("⚠️ 活动数已达到上限(19个)，无法继续添加")
+        } else {
+            showingCustomActivityCreation = true
+            print("➕ 点击新建活动按钮")
+        }
+    }
+    
+    // 获取优选的活动列表（确保包含"阅读"和自定义活动）
+    private func getPreferredActivities() -> [Activity] {
+        let allActivities = dataManager.getAllActivities()
+        
+        // 优先显示的活动名称列表
+        let preferredNames = [
+            "散步", "太极", "与朋友聊天", "与家人聊天", 
+            "阅读", "看电视", "听音乐", "休息", "烹饪"
+        ]
+        
+        var preferredActivities: [Activity] = []
+        
+        // 首先添加所有自定义活动（优先显示用户创建的活动）
+        let customActivities = allActivities.filter { $0.isCustom }
+        preferredActivities.append(contentsOf: customActivities)
+        
+        // 按优先级顺序添加预定义活动
+        for name in preferredNames {
+            if let activity = allActivities.first(where: { $0.name == name && !$0.isCustom }) {
+                preferredActivities.append(activity)
+            }
+            if preferredActivities.count >= 19 { break }
+        }
+        
+        // 如果还不足19个，补充其他预定义活动
+        if preferredActivities.count < 19 {
+            let remainingActivities = allActivities.filter { activity in
+                !preferredActivities.contains(where: { $0.id == activity.id }) && !activity.isCustom
+            }
+            let needed = 19 - preferredActivities.count
+            preferredActivities.append(contentsOf: Array(remainingActivities.prefix(needed)))
+        }
+        
+        print("📋 显示优选活动: \(preferredActivities.count)/19个，其中自定义活动: \(customActivities.count)个")
+        print("   - 自定义活动: \(customActivities.map { $0.name })")
+        print("   - 预定义活动: \(preferredActivities.filter { !$0.isCustom }.map { $0.name })")
+        return preferredActivities
     }
 }
 
-// MARK: - 活动标签视图
-struct ActivityTagView: View {
-    let activity: Activity
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: AppTheme.Spacing.xs) {
-                Image(systemName: activity.category.icon)
-                    .font(.caption)
-                    .foregroundColor(isSelected ? .white : AppTheme.Colors.primary)
-                
-                Text(activity.name)
-                    .font(AppTheme.Fonts.callout)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8) // 允许文字缩放以适应空间
-                    .truncationMode(.tail)
-            }
-            .frame(maxWidth: .infinity) // 让标签占满可用宽度
-            .padding(.horizontal, AppTheme.Spacing.sm)
-            .padding(.vertical, AppTheme.Spacing.sm)
-            .background(
-                isSelected ? AppTheme.Colors.primary : AppTheme.Colors.surface
-            )
-            .foregroundColor(
-                isSelected ? .white : AppTheme.Colors.textPrimary
-            )
-            .cornerRadius(AppTheme.CornerRadius.sm)
-            .overlay(
-                RoundedRectangle(cornerRadius: AppTheme.CornerRadius.sm)
-                    .stroke(
-                        isSelected ? AppTheme.Colors.primary : AppTheme.Colors.separator,
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isSelected ? 1.02 : 1.0) // 减小缩放效果避免布局跳动
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
-    }
-}
+
 
 #Preview {
     AddMoodEntryView()

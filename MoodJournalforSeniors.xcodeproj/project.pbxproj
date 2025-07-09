@@ -400,6 +400,9 @@
 				DEVELOPMENT_TEAM = FKKYF3QVJ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "心情日记需要使用相机来拍摄照片，记录生活中的美好瞬间和心情\n";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "心情日记需要使用麦克风来录制语音备注，帮助您更好地记录和表达情感\n";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "心情日记需要访问照片库来选择照片，为您的心情记录增添视觉元素\n";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +431,9 @@
 				DEVELOPMENT_TEAM = FKKYF3QVJ4;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "心情日记需要使用相机来拍摄照片，记录生活中的美好瞬间和心情\n";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "心情日记需要使用麦克风来录制语音备注，帮助您更好地记录和表达情感\n";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "心情日记需要访问照片库来选择照片，为您的心情记录增添视觉元素\n";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

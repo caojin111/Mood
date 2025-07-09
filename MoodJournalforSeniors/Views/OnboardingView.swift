@@ -10,25 +10,30 @@ struct OnboardingView: View {
             ZStack {
                 AppTheme.Colors.background
                     .ignoresSafeArea()
+                    .onAppear {
+                        print("🔄 OnboardingView 出现，当前步骤: \(onboardingData.currentStep.title)")
+                    }
                 
                 VStack(spacing: 0) {
-                    // 进度条
-                    ProgressView(value: onboardingData.progress)
-                        .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.Colors.primary))
-                        .frame(height: 4)
+                    // 进度条（Splash页面和付费墙页面不显示）
+                    if onboardingData.currentStep != .welcome && onboardingData.currentStep != .paywall {
+                        ProgressView(value: onboardingData.progress)
+                            .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.Colors.primary))
+                            .frame(height: 4)
+                            .padding(.horizontal, AppTheme.Spacing.lg)
+                            .padding(.top, AppTheme.Spacing.sm)
+                        
+                        // 步骤指示器
+                        HStack {
+                            Text("第 \(onboardingData.currentStep.rawValue + 1) 步，共 \(OnboardingStep.allCases.count) 步")
+                                .font(AppTheme.Fonts.caption)
+                                .foregroundColor(AppTheme.Colors.textSecondary)
+                            
+                            Spacer()
+                        }
                         .padding(.horizontal, AppTheme.Spacing.lg)
                         .padding(.top, AppTheme.Spacing.sm)
-                    
-                    // 步骤指示器
-                    HStack {
-                        Text("第 \(onboardingData.currentStep.rawValue + 1) 步，共 \(OnboardingStep.allCases.count) 步")
-                            .font(AppTheme.Fonts.caption)
-                            .foregroundColor(AppTheme.Colors.textSecondary)
-                        
-                        Spacer()
                     }
-                    .padding(.horizontal, AppTheme.Spacing.lg)
-                    .padding(.top, AppTheme.Spacing.sm)
                     
                     // 当前步骤内容
                     currentStepView
@@ -37,10 +42,12 @@ struct OnboardingView: View {
                             removal: .move(edge: .leading).combined(with: .opacity)
                         ))
                     
-                    // 导航按钮
-                    navigationButtons
-                        .padding(.horizontal, AppTheme.Spacing.lg)
-                        .padding(.bottom, AppTheme.Spacing.lg)
+                    // 导航按钮（Splash页面和付费墙页面不显示）
+                    if onboardingData.currentStep != .welcome && onboardingData.currentStep != .paywall {
+                        navigationButtons
+                            .padding(.horizontal, AppTheme.Spacing.lg)
+                            .padding(.bottom, AppTheme.Spacing.lg)
+                    }
                 }
             }
             .navigationBarHidden(true)
@@ -53,6 +60,7 @@ struct OnboardingView: View {
         switch onboardingData.currentStep {
         case .welcome:
             WelcomeStepView()
+                .environmentObject(onboardingData)
         case .gender:
             GenderSelectionStepView(selectedGender: $onboardingData.selectedGender)
         case .moodSkinSelection:
@@ -72,7 +80,9 @@ struct OnboardingView: View {
         case .pushNotification:
             PushNotificationStepView(pushNotificationEnabled: $onboardingData.pushNotificationEnabled)
         case .paywall:
-            PaywallStepView()
+            PaywallView()
+                .environmentObject(onboardingData)
+                .environmentObject(dataManager)
         }
     }
     

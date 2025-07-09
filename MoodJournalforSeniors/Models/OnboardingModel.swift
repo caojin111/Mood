@@ -15,7 +15,7 @@ enum OnboardingStep: Int, CaseIterable {
     var title: String {
         switch self {
         case .welcome:
-            return "欢迎使用心情日记"
+            return "心情日记"
         case .gender:
             return "请选择您的性别"
         case .moodSkinSelection:
@@ -38,7 +38,7 @@ enum OnboardingStep: Int, CaseIterable {
     var subtitle: String {
         switch self {
         case .welcome:
-            return "让我们一起开始记录您的美好心情"
+            return "Made by LazyCat"
         case .gender:
             return "这将帮助我们为您提供更好的服务"
         case .moodSkinSelection:

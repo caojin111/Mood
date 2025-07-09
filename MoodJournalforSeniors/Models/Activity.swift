@@ -44,14 +44,21 @@ struct Activity: Identifiable, Codable, Hashable {
     let name: String
     let category: ActivityCategory
     let isCustom: Bool
+    let customIcon: String? // 自定义图标名称
     
-    init(name: String, category: ActivityCategory, isCustom: Bool = false) {
+    init(name: String, category: ActivityCategory, isCustom: Bool = false, customIcon: String? = nil) {
         self.id = UUID()
         self.name = name
         self.category = category
         self.isCustom = isCustom
+        self.customIcon = customIcon
         
-        print("🎯 创建活动: \(name) - \(category.rawValue)")
+        print("🎯 创建活动: \(name) - \(category.rawValue)" + (customIcon != nil ? " 图标: \(customIcon!)" : ""))
+    }
+    
+    // 获取活动图标
+    var icon: String {
+        return customIcon ?? category.icon
     }
 }
 

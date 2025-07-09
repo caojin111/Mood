@@ -16,6 +16,7 @@ struct OnboardingTestView: View {
 // 单独测试各个步骤的Preview
 #Preview("欢迎页面") {
     WelcomeStepView()
+        .environmentObject(OnboardingData())
 }
 
 #Preview("性别选择") {
@@ -38,5 +39,7 @@ struct OnboardingTestView: View {
 
 // 测试数据状态的Preview  
 #Preview("Paywall页面") {
-    PaywallStepView()
+    PaywallView()
+        .environmentObject(OnboardingData())
+        .environmentObject(DataManager())
 } 

@@ -2,12 +2,19 @@ import SwiftUI
 
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var onboardingData: OnboardingData
+    @EnvironmentObject var dataManager: DataManager
     @State private var selectedPlan: SubscriptionPlan = .yearly
     @State private var isPurchasing = false
     @State private var showingRestorePurchases = false
+    @State private var showCloseButton = false
     
     var body: some View {
-        NavigationView {
+        // 全屏显示，不使用 NavigationView
+        ZStack {
+            AppTheme.Colors.background
+                .ignoresSafeArea()
+            
             ScrollView {
                 VStack(spacing: AppTheme.Spacing.xl) {
                     // 标题区域
@@ -26,16 +33,43 @@ struct PaywallView: View {
                     footerSection
                 }
                 .padding(AppTheme.Spacing.lg)
+                .padding(.top, 60) // 为顶部安全区域留出空间
             }
-            .navigationTitle("升级至专业版")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("关闭") {
-                        dismiss()
-                        print("❌ 关闭付费墙")
+            
+            // 延时显示的关闭按钮
+            VStack {
+                HStack {
+                    Spacer()
+                    
+                    if showCloseButton {
+                        Button(action: {
+                            print("❌ 跳过付费墙，继续 Onboarding")
+                            // 触发完成 Onboarding 流程
+                            completeOnboarding()
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(AppTheme.Colors.textSecondary)
+                                .background(Color.white)
+                                .clipShape(Circle())
+                        }
+                        .padding(.trailing, AppTheme.Spacing.lg)
+                        .padding(.top, AppTheme.Spacing.lg)
+                        .transition(.opacity.combined(with: .scale))
                     }
                 }
+                
+                Spacer()
+            }
+        }
+        .onAppear {
+            print("🎬 PaywallView 出现，3秒后显示关闭按钮")
+            // 延时3秒显示关闭按钮
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    showCloseButton = true
+                }
+                print("✅ 显示关闭按钮")
             }
         }
     }
@@ -215,8 +249,56 @@ struct PaywallView: View {
             isPurchasing = false
             // 模拟购买成功
             print("✅ 购买成功")
-            dismiss()
+            completeOnboarding()
         }
+    }
+    
+    private func completeOnboarding() {
+        print("✅ 从付费墙完成 Onboarding 流程")
+        
+        // 保存Onboarding数据
+        saveOnboardingData()
+        
+        // 标记Onboarding为已完成
+        UserDefaults.standard.set(true, forKey: "OnboardingCompleted")
+        
+        onboardingData.completeOnboarding()
+        
+        // 发送通知给ContentView
+        NotificationCenter.default.post(name: NSNotification.Name("OnboardingCompleted"), object: nil)
+        
+        print("📢 发送Onboarding完成通知")
+    }
+    
+    private func saveOnboardingData() {
+        print("💾 从付费墙保存 Onboarding 数据")
+        
+        // 更新用户配置
+        var profile = dataManager.userProfile
+        profile.gender = onboardingData.selectedGender ?? .other
+        profile.selectedMoodSkinPack = onboardingData.selectedMoodSkinPack ?? "default_emoji" // 设置默认值
+        profile.preferredColorScheme = onboardingData.selectedColorScheme.rawValue
+        profile.interestedCategories = onboardingData.selectedInterests.isEmpty ? 
+            ["family"] : Array(onboardingData.selectedInterests.map { $0.rawValue }) // 设置默认兴趣
+        profile.birthday = onboardingData.selectedBirthday
+        profile.enableDailyReminder = onboardingData.dailyReminderEnabled
+        profile.dailyReminderTime = onboardingData.reminderTime
+        profile.enableHealthTips = onboardingData.healthTipsEnabled
+        
+        // 调试日志
+        print("💾 保存的数据详情：")
+        print("  - 性别: \(profile.gender?.displayName ?? "未设置")")
+        print("  - 心情皮肤包: \(profile.selectedMoodSkinPack ?? "未设置")")
+        print("  - 颜色主题: \(profile.preferredColorScheme)")
+        print("  - 兴趣类别数量: \(profile.interestedCategories.count)")
+        print("  - 兴趣类别: \(profile.interestedCategories)")
+        print("  - 生日: \(profile.birthday ?? Date())")
+        print("  - 每日提醒: \(profile.enableDailyReminder)")
+        print("  - 健康贴士: \(profile.enableHealthTips)")
+        print("  - Onboarding完成状态: \(profile.isOnboardingCompleted)")
+        
+        dataManager.updateUserProfile(profile)
+        print("💾 从付费墙保存 Onboarding 数据到 DataManager 完成")
     }
     
     private func restorePurchases() {
@@ -420,4 +502,6 @@ struct SubscriptionPlanCard: View {
 
 #Preview {
     PaywallView()
+        .environmentObject(OnboardingData())
+        .environmentObject(DataManager())
 } 

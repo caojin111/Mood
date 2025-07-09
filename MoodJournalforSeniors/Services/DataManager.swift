@@ -162,6 +162,17 @@ class DataManager: ObservableObject {
         print("🔔 更新通知设置: 每日提醒 \(dailyReminder), 周回顾 \(weeklyReview)")
     }
     
+    // 更新触感设置
+    func updateHapticSettings(enabled: Bool, intensity: Double) {
+        var updatedProfile = userProfile
+        updatedProfile.enableHapticFeedback = enabled
+        updatedProfile.hapticIntensity = intensity
+        updatedProfile.updatedAt = Date()
+        
+        updateUserProfile(updatedProfile)
+        print("📳 更新触感设置: 启用 \(enabled), 强度 \(intensity)")
+    }
+    
     private func saveUserProfile() {
         if let data = try? JSONEncoder().encode(userProfile) {
             UserDefaults.standard.set(data, forKey: userProfileKey)
@@ -201,7 +212,13 @@ class DataManager: ObservableObject {
     func addCustomActivity(_ activity: Activity) {
         customActivities.append(activity)
         saveCustomActivities()
-        print("🎯 添加自定义活动: \(activity.name)")
+        print("🎯 添加自定义活动: \(activity.name)，当前自定义活动总数: \(customActivities.count)")
+        print("🎯 活动详情: 分类=\(activity.category.rawValue), 图标=\(activity.icon), isCustom=\(activity.isCustom)")
+        
+        // 触发UI更新（强制刷新）
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
     }
     
     func deleteCustomActivity(_ activity: Activity) {
@@ -219,7 +236,36 @@ class DataManager: ObservableObject {
     
     // MARK: - 获取所有可用活动
     func getAllActivities() -> [Activity] {
-        return Activity.predefinedActivities + customActivities
+        let allActivities = Activity.predefinedActivities + customActivities
+        print("📋 获取所有活动: 预定义=\(Activity.predefinedActivities.count), 自定义=\(customActivities.count), 总计=\(allActivities.count)")
+        return allActivities
+    }
+    
+    // 调试方法：打印当前自定义活动状态
+    func debugCustomActivities() {
+        print("🔍 调试自定义活动状态:")
+        print("   - 自定义活动数量: \(customActivities.count)")
+        for (index, activity) in customActivities.enumerated() {
+            print("   - [\(index)] \(activity.name) (分类: \(activity.category.rawValue), 图标: \(activity.icon))")
+        }
+    }
+    
+    // 检查活动显示限制情况
+    func checkActivityDisplayStatus() {
+        let totalActivities = getAllActivities().count
+        let customCount = customActivities.count
+        let predefinedCount = Activity.predefinedActivities.count
+        
+        print("📊 活动显示状态检查:")
+        print("   - 总活动数: \(totalActivities) (自定义: \(customCount), 预定义: \(predefinedCount))")
+        print("   - 最大显示数: 19 + 1个新建按钮 = 20个")
+        
+        if customCount > 19 {
+            print("   ⚠️ 警告: 自定义活动数量(\(customCount))超过最大显示限制(19)，部分活动将不会显示")
+        } else {
+            let remainingSlots = 19 - customCount
+            print("   ✅ 可显示所有自定义活动，剩余 \(remainingSlots) 个位置给预定义活动")
+        }
     }
     
     // MARK: - 数据统计
@@ -389,6 +435,94 @@ class DataManager: ObservableObject {
         formatter.dateFormat = "yyyy年MM月dd日"
         
         return "\(formatter.string(from: startDate)) - \(formatter.string(from: endDate))"
+    }
+    
+    // MARK: - 媒体文件管理
+    
+    // 保存图片到文档目录
+    func saveImage(_ image: UIImage) -> URL? {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let filename = "mood_image_\(Date().timeIntervalSince1970).jpg"
+        let fileURL = documentsPath.appendingPathComponent(filename)
+        
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ 图片数据转换失败")
+            return nil
+        }
+        
+        do {
+            try imageData.write(to: fileURL)
+            print("📸 图片保存成功: \(filename)")
+            return fileURL
+        } catch {
+            print("❌ 图片保存失败: \(error)")
+            return nil
+        }
+    }
+    
+    // 删除媒体文件
+    func deleteMediaFile(at url: URL) {
+        do {
+            try FileManager.default.removeItem(at: url)
+            print("🗑️ 删除媒体文件成功: \(url.lastPathComponent)")
+        } catch {
+            print("❌ 删除媒体文件失败: \(error)")
+        }
+    }
+    
+    // 获取媒体文件大小
+    func getMediaFileSize(at url: URL) -> String {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let size = attributes[.size] as? NSNumber {
+                let bytes = size.doubleValue
+                let formatter = ByteCountFormatter()
+                formatter.allowedUnits = [.useKB, .useMB]
+                formatter.countStyle = .file
+                return formatter.string(fromByteCount: Int64(bytes))
+            }
+        } catch {
+            print("❌ 获取文件大小失败: \(error)")
+        }
+        return "未知"
+    }
+    
+    // 清理孤立的媒体文件（没有被任何心情日记引用的文件）
+    func cleanupOrphanedMediaFiles() {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        
+        do {
+            let fileURLs = try FileManager.default.contentsOfDirectory(at: documentsPath, 
+                                                                       includingPropertiesForKeys: nil)
+            
+            // 获取所有被引用的媒体文件URL
+            var referencedURLs = Set<URL>()
+            for entry in moodEntries {
+                if let audioURL = entry.audioURL {
+                    referencedURLs.insert(audioURL)
+                }
+                if let imageURL = entry.imageURL {
+                    referencedURLs.insert(imageURL)
+                }
+            }
+            
+            // 删除未被引用的媒体文件
+            var deletedCount = 0
+            for fileURL in fileURLs {
+                let filename = fileURL.lastPathComponent
+                if (filename.hasPrefix("mood_image_") || filename.hasPrefix("recording_")) 
+                   && !referencedURLs.contains(fileURL) {
+                    try FileManager.default.removeItem(at: fileURL)
+                    deletedCount += 1
+                    print("🗑️ 清理孤立文件: \(filename)")
+                }
+            }
+            
+            print("✅ 媒体文件清理完成，删除了 \(deletedCount) 个孤立文件")
+            
+        } catch {
+            print("❌ 媒体文件清理失败: \(error)")
+        }
     }
 }
 

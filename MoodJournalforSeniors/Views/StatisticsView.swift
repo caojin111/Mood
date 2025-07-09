@@ -168,56 +168,51 @@ struct StatisticsView: View {
     
     // 活动分析区域
     private func activityAnalysisSection(_ stats: MoodStatistics) -> some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
+        let activityStats = calculateActivityStats(stats.entries)
+        
+        return VStack(alignment: .leading, spacing: AppTheme.Spacing.md) {
             Text("活动分析")
                 .font(AppTheme.Fonts.title2)
                 .foregroundColor(AppTheme.Colors.textPrimary)
             
-            let activityStats = calculateActivityStats(stats.entries)
-            
-            if activityStats.isEmpty {
-                VStack(spacing: AppTheme.Spacing.sm) {
-                    Image(systemName: "figure.walk")
-                        .font(.system(size: 30))
-                        .foregroundColor(AppTheme.Colors.textTertiary)
-                    
-                    Text("暂无活动数据")
-                        .font(AppTheme.Fonts.body)
-                        .foregroundColor(AppTheme.Colors.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(AppTheme.Spacing.lg)
-            } else {
-                VStack(spacing: AppTheme.Spacing.sm) {
-                    ForEach(activityStats.prefix(5), id: \.activity.id) { stat in
-                        HStack {
-                            Image(systemName: stat.activity.category.icon)
-                                .foregroundColor(AppTheme.Colors.primary)
-                                .frame(width: 20)
-                            
-                            Text(stat.activity.name)
-                                .font(AppTheme.Fonts.callout)
-                                .foregroundColor(AppTheme.Colors.textPrimary)
-                            
-                            Spacer()
-                            
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("\(stat.count)次")
-                                    .font(AppTheme.Fonts.caption)
-                                    .foregroundColor(AppTheme.Colors.textSecondary)
-                                
-                                Text("平均\(String(format: "%.1f", stat.averageMood))")
-                                    .font(AppTheme.Fonts.caption)
-                                    .foregroundColor(AppTheme.Colors.moodColor(for: Int(stat.averageMood.rounded())))
-                            }
-                        }
-                        .padding(.vertical, AppTheme.Spacing.xs)
-                    }
-                }
-            }
+            activityContentView(activityStats: activityStats)
         }
         .padding(AppTheme.Spacing.cardPadding)
         .cardStyle()
+    }
+    
+    // 活动内容视图
+    @ViewBuilder
+    private func activityContentView(activityStats: [ActivityStat]) -> some View {
+        if activityStats.isEmpty {
+            activityEmptyStateView
+        } else {
+            activityListView(activityStats: activityStats)
+        }
+    }
+    
+    // 活动空状态视图
+    private var activityEmptyStateView: some View {
+        VStack(spacing: AppTheme.Spacing.sm) {
+            Image(systemName: "figure.walk")
+                .font(.system(size: 30))
+                .foregroundColor(AppTheme.Colors.textTertiary)
+            
+            Text("暂无活动数据")
+                .font(AppTheme.Fonts.body)
+                .foregroundColor(AppTheme.Colors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(AppTheme.Spacing.lg)
+    }
+    
+    // 活动列表视图
+    private func activityListView(activityStats: [ActivityStat]) -> some View {
+        VStack(spacing: AppTheme.Spacing.sm) {
+            ForEach(Array(activityStats.prefix(5)), id: \.activity.id) { stat in
+                ActivityStatRow(stat: stat)
+            }
+        }
     }
     
     // 详细数据区域
@@ -466,6 +461,67 @@ struct DetailDataRow: View {
                 .foregroundColor(AppTheme.Colors.textPrimary)
         }
         .padding(.vertical, 2)
+    }
+}
+
+// MARK: - 活动统计行组件
+struct ActivityStatRow: View {
+    let stat: ActivityStat
+    
+    var body: some View {
+        HStack {
+            // 活动图标
+            Image(systemName: stat.activity.icon)
+                .foregroundColor(iconColor)
+                .frame(width: 20)
+            
+            // 活动名称和自定义标识
+            activityNameView
+            
+            Spacer()
+            
+            // 统计数据
+            statisticsView
+        }
+        .padding(.vertical, AppTheme.Spacing.xs)
+    }
+    
+    private var iconColor: Color {
+        stat.activity.isCustom ? AppTheme.Colors.warning : AppTheme.Colors.primary
+    }
+    
+    private var activityNameView: some View {
+        HStack(spacing: AppTheme.Spacing.xs) {
+            Text(stat.activity.name)
+                .font(AppTheme.Fonts.callout)
+                .foregroundColor(AppTheme.Colors.textPrimary)
+            
+            if stat.activity.isCustom {
+                customBadge
+            }
+        }
+    }
+    
+    private var customBadge: some View {
+        Text("自定义")
+            .font(AppTheme.Fonts.caption)
+            .foregroundColor(.white)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 1)
+            .background(AppTheme.Colors.warning)
+            .cornerRadius(4)
+    }
+    
+    private var statisticsView: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            Text("\(stat.count)次")
+                .font(AppTheme.Fonts.caption)
+                .foregroundColor(AppTheme.Colors.textSecondary)
+            
+            Text("平均\(String(format: "%.1f", stat.averageMood))")
+                .font(AppTheme.Fonts.caption)
+                .foregroundColor(AppTheme.Colors.moodColor(for: Int(stat.averageMood.rounded())))
+        }
     }
 }
 
