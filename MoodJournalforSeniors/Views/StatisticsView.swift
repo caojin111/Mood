@@ -184,7 +184,7 @@ struct StatisticsView: View {
     // 活动内容视图
     @ViewBuilder
     private func activityContentView(activityStats: [ActivityStat]) -> some View {
-        if activityStats.isEmpty {
+            if activityStats.isEmpty {
             activityEmptyStateView
         } else {
             activityListView(activityStats: activityStats)
@@ -193,26 +193,26 @@ struct StatisticsView: View {
     
     // 活动空状态视图
     private var activityEmptyStateView: some View {
-        VStack(spacing: AppTheme.Spacing.sm) {
-            Image(systemName: "figure.walk")
-                .font(.system(size: 30))
-                .foregroundColor(AppTheme.Colors.textTertiary)
-            
-            Text("暂无活动数据")
-                .font(AppTheme.Fonts.body)
-                .foregroundColor(AppTheme.Colors.textSecondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(AppTheme.Spacing.lg)
+                VStack(spacing: AppTheme.Spacing.sm) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 30))
+                        .foregroundColor(AppTheme.Colors.textTertiary)
+                    
+                    Text("暂无活动数据")
+                        .font(AppTheme.Fonts.body)
+                        .foregroundColor(AppTheme.Colors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(AppTheme.Spacing.lg)
     }
     
     // 活动列表视图
     private func activityListView(activityStats: [ActivityStat]) -> some View {
-        VStack(spacing: AppTheme.Spacing.sm) {
+                VStack(spacing: AppTheme.Spacing.sm) {
             ForEach(Array(activityStats.prefix(5)), id: \.activity.id) { stat in
                 ActivityStatRow(stat: stat)
-            }
-        }
+                            }
+                        }
     }
     
     // 详细数据区域

@@ -41,19 +41,19 @@ struct AddMoodEntryView: View {
                 }
                 .padding(.horizontal, AppTheme.Spacing.md)
                 .padding(.vertical, AppTheme.Spacing.sm) // 减少垂直边距
-                    }
-        .background(AppTheme.Colors.background)
-        .navigationTitle("记录心情")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button("取消") {
-                    presentationMode.wrappedValue.dismiss()
-                    print("❌ 取消添加心情日记")
-                }
-                .foregroundColor(AppTheme.Colors.textSecondary)
             }
-        }
+            .background(AppTheme.Colors.background)
+            .navigationTitle("记录心情")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") {
+                        presentationMode.wrappedValue.dismiss()
+                        print("❌ 取消添加心情日记")
+                    }
+                    .foregroundColor(AppTheme.Colors.textSecondary)
+                }
+            }
         .onAppear {
             // 调试：检查自定义活动状态
             dataManager.debugCustomActivities()

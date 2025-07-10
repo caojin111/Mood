@@ -436,7 +436,7 @@ struct UserProfileView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: AppTheme.Spacing.lg) {
+            VStack(spacing: AppTheme.Spacing.lg) {
                     // 性别选择
                     genderSelectionSection
                     
@@ -873,7 +873,9 @@ struct DataExportView: View {
     @EnvironmentObject var dataManager: DataManager
     @Environment(\.dismiss) private var dismiss
     @State private var showingShareSheet = false
-    @State private var exportedData = ""
+    @State private var exportItems: [Any] = []
+    @State private var showingExportAlert = false
+    @State private var alertMessage = ""
     
     private var dataSummary: [String: Any] {
         dataManager.getDataSummary()
@@ -891,7 +893,7 @@ struct DataExportView: View {
                         .font(AppTheme.Fonts.title1)
                         .foregroundColor(AppTheme.Colors.textPrimary)
                     
-                    Text("将您的心情日记数据导出备份，或分享给信任的人")
+                    Text("将您的心情日记数据导出为PDF报告或CSV表格，方便保存和分析")
                         .font(AppTheme.Fonts.body)
                         .foregroundColor(AppTheme.Colors.textSecondary)
                         .multilineTextAlignment(.center)
@@ -914,16 +916,40 @@ struct DataExportView: View {
                 .background(AppTheme.Colors.surface)
                 .cornerRadius(AppTheme.CornerRadius.lg)
                 
+                // 导出格式说明
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.sm) {
+                    Text("导出格式说明")
+                        .font(AppTheme.Fonts.headline)
+                        .foregroundColor(AppTheme.Colors.textPrimary)
+                    
+                    VStack(spacing: AppTheme.Spacing.xs) {
+                        ExportFormatRow(
+                            icon: "doc.richtext",
+                            title: "PDF报告",
+                            description: "完整的图文报告，包含统计分析和详细记录"
+                        )
+                        
+                        ExportFormatRow(
+                            icon: "tablecells",
+                            title: "CSV表格", 
+                            description: "结构化数据表格，便于在Excel等软件中分析"
+                        )
+                    }
+                }
+                .padding(AppTheme.Spacing.cardPadding)
+                .background(AppTheme.Colors.surface)
+                .cornerRadius(AppTheme.CornerRadius.lg)
+                
                 // 导出按钮
                 VStack(spacing: AppTheme.Spacing.md) {
-                    Button("导出JSON数据") {
-                        exportAsJSON()
+                    Button("导出PDF报告") {
+                        exportAsPDF()
                     }
                     .frame(maxWidth: .infinity)
                     .primaryButtonStyle()
                     
-                    Button("生成备份报告") {
-                        generateBackupReport()
+                    Button("导出CSV表格") {
+                        exportAsCSV()
                     }
                     .frame(maxWidth: .infinity)
                     .secondaryButtonStyle()
@@ -931,7 +957,7 @@ struct DataExportView: View {
                 
                 Spacer()
                 
-                Text("导出的数据包含您的所有心情记录和设置信息")
+                Text("导出的数据包含您的所有心情记录和统计信息")
                     .font(AppTheme.Fonts.caption)
                     .foregroundColor(AppTheme.Colors.textTertiary)
                     .multilineTextAlignment(.center)
@@ -948,37 +974,120 @@ struct DataExportView: View {
             }
         }
         .sheet(isPresented: $showingShareSheet) {
-            ShareSheet(items: [exportedData])
+            ShareSheet(items: exportItems)
+        }
+        .alert("导出提示", isPresented: $showingExportAlert) {
+            Button("确定") { }
+        } message: {
+            Text(alertMessage)
         }
     }
     
-    private func exportAsJSON() {
-        exportedData = dataManager.exportDataAsJSON()
-        if !exportedData.isEmpty {
+    private func exportAsPDF() {
+        print("📤 开始导出PDF格式")
+        
+        // 检查是否有生成PDF的数据
+        if dataManager.moodEntries.isEmpty {
+            print("⚠️ 没有心情记录数据，生成示例PDF")
+        }
+        
+        guard let pdfData = dataManager.exportDataAsPDF() else {
+            print("❌ PDF数据生成失败")
+            alertMessage = "PDF导出失败，请稍后重试"
+            showingExportAlert = true
+            return
+        }
+        
+        print("✅ PDF数据生成成功，大小: \(pdfData.count) 字节")
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let filename = "心情日记报告_\(dateFormatter.string(from: Date())).pdf"
+        
+        // 创建临时文件
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        
+        do {
+            try pdfData.write(to: tempURL)
+            print("✅ PDF文件写入成功: \(tempURL.path)")
+            
+            // 验证文件是否真的存在
+            if FileManager.default.fileExists(atPath: tempURL.path) {
+                let fileSize = try FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int ?? 0
+                print("✅ 文件验证成功，大小: \(fileSize) 字节")
+                
+                exportItems = [tempURL]
+                showingShareSheet = true
+                print("📤 PDF导出成功: \(filename)")
+            } else {
+                print("❌ 文件写入后不存在")
+                alertMessage = "PDF文件创建失败"
+                showingExportAlert = true
+            }
+        } catch {
+            alertMessage = "PDF文件保存失败: \(error.localizedDescription)"
+            showingExportAlert = true
+            print("❌ PDF保存失败: \(error)")
+        }
+    }
+    
+    private func exportAsCSV() {
+        print("📤 开始导出CSV格式")
+        
+        let csvContent = dataManager.exportDataAsCSV()
+        
+        if csvContent.isEmpty {
+            alertMessage = "没有数据可导出"
+            showingExportAlert = true
+            return
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let filename = "心情日记数据_\(dateFormatter.string(from: Date())).csv"
+        
+        // 创建临时文件
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        
+        do {
+            try csvContent.write(to: tempURL, atomically: true, encoding: .utf8)
+            exportItems = [tempURL]
             showingShareSheet = true
+            print("📤 CSV导出成功: \(filename)")
+        } catch {
+            alertMessage = "CSV文件保存失败: \(error.localizedDescription)"
+            showingExportAlert = true
+            print("❌ CSV保存失败: \(error)")
         }
     }
+}
+
+// 导出格式说明行
+struct ExportFormatRow: View {
+    let icon: String
+    let title: String
+    let description: String
     
-    private func generateBackupReport() {
-        let summary = dataSummary
-        let reportText = """
-        心情日记备份报告
-        
-        导出日期: \(DateFormatter.localizedString(from: Date(), dateStyle: .long, timeStyle: .short))
-        
-        数据统计:
-        • 心情记录总数: \(summary["totalEntries"] as? Int ?? 0) 条
-        • 平均心情评分: \(String(format: "%.1f", summary["averageMood"] as? Double ?? 0.0))
-        • 记录时间范围: \(summary["dateRange"] as? String ?? "无数据")
-        • 自定义活动: \(summary["customActivitiesCount"] as? Int ?? 0) 个
-        • 会员状态: \(summary["isPremium"] as? Bool == true ? "付费用户" : "免费用户")
-        
-        此报告由心情日记应用自动生成。
-        """
-        
-        exportedData = reportText
-        showingShareSheet = true
-        print("📋 生成备份报告")
+    var body: some View {
+        HStack(spacing: AppTheme.Spacing.sm) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(AppTheme.Colors.primary)
+                .frame(width: 24)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(AppTheme.Fonts.callout)
+                    .fontWeight(.medium)
+                    .foregroundColor(AppTheme.Colors.textPrimary)
+                
+                Text(description)
+                    .font(AppTheme.Fonts.caption)
+                    .foregroundColor(AppTheme.Colors.textSecondary)
+            }
+            
+            Spacer()
+        }
     }
 }
 
@@ -1028,7 +1137,7 @@ struct PrivacySettingsView: View {
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: AppTheme.Spacing.lg) {
+            VStack(spacing: AppTheme.Spacing.lg) {
                     // 标题说明
                     headerSection
                     

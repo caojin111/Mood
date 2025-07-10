@@ -1,5 +1,33 @@
 import Foundation
 import SwiftUI
+import UIKit
+
+// MARK: - 导出格式枚举
+enum ExportFormat {
+    case pdf
+    case csv
+    
+    var fileExtension: String {
+        switch self {
+        case .pdf: return "pdf"
+        case .csv: return "csv"
+        }
+    }
+    
+    var mimeType: String {
+        switch self {
+        case .pdf: return "application/pdf"
+        case .csv: return "text/csv"
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .pdf: return "PDF报告"
+        case .csv: return "CSV表格"
+        }
+    }
+}
 
 // MARK: - 数据管理器
 class DataManager: ObservableObject {
@@ -387,25 +415,281 @@ class DataManager: ObservableObject {
     }
     
     // MARK: - 数据导出功能
-    func exportDataAsJSON() -> String {
-        let exportData = [
-            "userProfile": userProfile,
-            "moodEntries": moodEntries,
-            "customActivities": customActivities,
-            "exportDate": Date()
-        ] as [String : Any]
+    
+    // 导出为CSV格式
+    func exportDataAsCSV() -> String {
+        print("📤 开始导出CSV格式数据")
         
-        do {
-            let jsonData = try JSONSerialization.data(withJSONObject: exportData, options: .prettyPrinted)
-            if let jsonString = String(data: jsonData, encoding: .utf8) {
-                print("📤 数据导出成功，共 \(moodEntries.count) 条心情记录")
-                return jsonString
-            }
-        } catch {
-            print("❌ 数据导出失败: \(error)")
+        var csvContent = "日期,时间,心情等级,心情描述,活动,备注,包含语音,包含图片\n"
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        let timeFormatter = DateFormatter()
+        timeFormatter.locale = Locale(identifier: "zh_CN")
+        timeFormatter.dateFormat = "HH:mm"
+        
+        for entry in moodEntries.sorted(by: { $0.date > $1.date }) {
+            let date = dateFormatter.string(from: entry.date)
+            let time = timeFormatter.string(from: entry.date)
+            let activities = entry.activities.map { $0.name }.joined(separator: "; ")
+            let note = entry.note?.replacingOccurrences(of: "\"", with: "\"\"") ?? ""
+            let hasAudio = entry.audioURL != nil ? "是" : "否"
+            let hasImage = entry.imageURL != nil ? "是" : "否"
+            
+            csvContent += "\"\(date)\",\"\(time)\",\(entry.moodLevel),\"\(entry.moodDescription)\",\"\(activities)\",\"\(note)\",\"\(hasAudio)\",\"\(hasImage)\"\n"
         }
         
-        return ""
+        print("📤 CSV导出成功，共 \(moodEntries.count) 条记录")
+        return csvContent
+    }
+    
+    // 导出为PDF格式
+    func exportDataAsPDF() -> Data? {
+        print("📤 开始导出PDF格式数据，当前记录数: \(moodEntries.count)")
+        
+        // 检查是否有数据
+        if moodEntries.isEmpty {
+            print("⚠️ 没有心情记录数据，仍生成包含说明的PDF")
+        }
+        
+        let pdfMetaData = [
+            kCGPDFContextCreator: "心情日记应用",
+            kCGPDFContextAuthor: getUserDisplayName(),
+            kCGPDFContextTitle: "心情日记数据报告"
+        ]
+        
+        let format = UIGraphicsPDFRendererFormat()
+        format.documentInfo = pdfMetaData as [String: Any]
+        
+        let pageWidth: CGFloat = 8.5 * 72.0
+        let pageHeight: CGFloat = 11 * 72.0
+        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
+        let margin: CGFloat = 50
+        
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect, format: format)
+        
+        let data = renderer.pdfData { context in
+            var yPosition: CGFloat = margin
+            let availableWidth = pageWidth - 2 * margin
+            
+            print("📄 开始绘制PDF页面，页面尺寸: \(pageWidth)x\(pageHeight)")
+            
+            // 开始新页面
+            context.beginPage()
+            
+            // 标题
+            yPosition = drawPDFTitle(in: pageRect, at: yPosition, margin: margin)
+            
+            // 用户信息
+            yPosition = drawPDFUserInfo(in: pageRect, at: yPosition, margin: margin, availableWidth: availableWidth)
+            
+            // 统计概览
+            yPosition = drawPDFStatistics(in: pageRect, at: yPosition, margin: margin, availableWidth: availableWidth)
+            
+            // 心情记录详情
+            yPosition = drawPDFEntries(in: pageRect, at: yPosition, margin: margin, availableWidth: availableWidth, context: context)
+            
+            print("📄 PDF页面绘制完成，最终Y位置: \(yPosition)")
+        }
+        
+        print("📤 PDF导出成功，文件大小: \(data.count) 字节")
+        return data
+    }
+    
+    // PDF标题绘制
+    private func drawPDFTitle(in pageRect: CGRect, at yPosition: CGFloat, margin: CGFloat) -> CGFloat {
+        print("📄 绘制PDF标题，Y位置: \(yPosition)")
+        
+        let titleText = "心情日记数据报告"
+        let titleFont = UIFont.boldSystemFont(ofSize: 24)
+        let titleAttributes: [NSAttributedString.Key: Any] = [
+            .font: titleFont,
+            .foregroundColor: UIColor.black
+        ]
+        
+        let titleRect = CGRect(x: margin, y: yPosition, width: pageRect.width - 2 * margin, height: 30)
+        titleText.draw(in: titleRect, withAttributes: titleAttributes)
+        
+        print("📄 标题绘制完成")
+        return yPosition + 50
+    }
+    
+    // PDF用户信息绘制
+    private func drawPDFUserInfo(in pageRect: CGRect, at yPosition: CGFloat, margin: CGFloat, availableWidth: CGFloat) -> CGFloat {
+        var currentY = yPosition
+        let font = UIFont.systemFont(ofSize: 12)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black]
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "zh_CN")
+        dateFormatter.dateFormat = "yyyy年MM月dd日 HH:mm"
+        
+        let userInfo = [
+            "用户: \(getUserDisplayName())",
+            "导出时间: \(dateFormatter.string(from: Date()))",
+            "记录总数: \(moodEntries.count) 条",
+            "自定义活动: \(customActivities.count) 个"
+        ]
+        
+        for info in userInfo {
+            let rect = CGRect(x: margin, y: currentY, width: availableWidth, height: 20)
+            info.draw(in: rect, withAttributes: attributes)
+            currentY += 25
+        }
+        
+        return currentY + 20
+    }
+    
+    // PDF统计概览绘制
+    private func drawPDFStatistics(in pageRect: CGRect, at yPosition: CGFloat, margin: CGFloat, availableWidth: CGFloat) -> CGFloat {
+        print("📄 绘制统计概览，Y位置: \(yPosition)")
+        
+        var currentY = yPosition
+        let titleFont = UIFont.boldSystemFont(ofSize: 16)
+        let font = UIFont.systemFont(ofSize: 12)
+        
+        // 标题
+        let titleAttributes: [NSAttributedString.Key: Any] = [.font: titleFont, .foregroundColor: UIColor.black]
+        let titleRect = CGRect(x: margin, y: currentY, width: availableWidth, height: 20)
+        "数据统计概览".draw(in: titleRect, withAttributes: titleAttributes)
+        currentY += 30
+        
+        // 统计数据
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black]
+        
+        if moodEntries.isEmpty {
+            // 没有数据时的显示
+            let emptyStatistics = [
+                "记录总数: 0 条",
+                "平均心情评分: 暂无数据",
+                "记录时间跨度: 暂无数据",
+                "自定义活动: \(customActivities.count) 个"
+            ]
+            
+            for stat in emptyStatistics {
+                let rect = CGRect(x: margin, y: currentY, width: availableWidth, height: 20)
+                stat.draw(in: rect, withAttributes: attributes)
+                currentY += 25
+            }
+        } else {
+            // 有数据时的正常统计
+            let stats = getMoodStatistics(for: .year)
+            let statistics = [
+                "记录总数: \(moodEntries.count) 条",
+                "平均心情评分: \(String(format: "%.1f", stats.averageMood))",
+                "最好心情次数: \(stats.moodCounts[5] ?? 0) 次",
+                "最差心情次数: \(stats.moodCounts[1] ?? 0) 次",
+                "记录时间跨度: \(getDateRange())",
+                "自定义活动: \(customActivities.count) 个"
+            ]
+            
+            for stat in statistics {
+                let rect = CGRect(x: margin, y: currentY, width: availableWidth, height: 20)
+                stat.draw(in: rect, withAttributes: attributes)
+                currentY += 25
+            }
+        }
+        
+        print("📄 统计概览绘制完成")
+        return currentY + 30
+    }
+    
+    // PDF心情记录详情绘制
+    private func drawPDFEntries(in pageRect: CGRect, at yPosition: CGFloat, margin: CGFloat, availableWidth: CGFloat, context: UIGraphicsPDFRendererContext) -> CGFloat {
+        print("📄 绘制心情记录详情，Y位置: \(yPosition)")
+        
+        var currentY = yPosition
+        let titleFont = UIFont.boldSystemFont(ofSize: 16)
+        let font = UIFont.systemFont(ofSize: 10)
+        let pageHeight = pageRect.height
+        
+        // 标题
+        let titleAttributes: [NSAttributedString.Key: Any] = [.font: titleFont, .foregroundColor: UIColor.black]
+        let titleRect = CGRect(x: margin, y: currentY, width: availableWidth, height: 20)
+        "详细心情记录".draw(in: titleRect, withAttributes: titleAttributes)
+        currentY += 30
+        
+        let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: UIColor.black]
+        
+        if moodEntries.isEmpty {
+            // 没有数据时显示提示信息
+            let emptyMessage = "暂时还没有心情记录数据。\n\n开始记录您的第一份心情日记吧！"
+            let rect = CGRect(x: margin, y: currentY, width: availableWidth, height: 60)
+            emptyMessage.draw(in: rect, withAttributes: attributes)
+            currentY += 80
+            
+            print("📄 显示空数据提示")
+        } else {
+            // 有数据时显示详细记录
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "zh_CN")
+            dateFormatter.dateFormat = "MM-dd HH:mm"
+            
+            let sortedEntries = moodEntries.sorted { $0.date > $1.date }
+            print("📄 开始绘制 \(sortedEntries.count) 条心情记录")
+            
+            for (index, entry) in sortedEntries.enumerated() {
+                // 检查是否需要新页面
+                if currentY > pageHeight - 100 {
+                    print("📄 创建新页面，当前记录: \(index + 1)/\(sortedEntries.count)")
+                    context.beginPage()
+                    currentY = margin
+                }
+                
+                let dateStr = dateFormatter.string(from: entry.date)
+                let activities = entry.activities.map { $0.name }.joined(separator: ", ")
+                let mediaInfo = buildMediaInfoString(entry: entry)
+                
+                let entryLines = [
+                    "\(dateStr) - \(entry.moodDescription) (\(entry.moodLevel)/5)",
+                    activities.isEmpty ? "无活动记录" : "活动: \(activities)",
+                    entry.note?.isEmpty == false ? "备注: \(entry.note!)" : "无备注",
+                    mediaInfo.isEmpty ? "无媒体文件" : mediaInfo
+                ]
+                
+                for line in entryLines {
+                    let rect = CGRect(x: margin, y: currentY, width: availableWidth, height: 15)
+                    line.draw(in: rect, withAttributes: attributes)
+                    currentY += 18
+                }
+                
+                currentY += 10 // 记录间距
+            }
+            
+            print("📄 所有记录绘制完成")
+        }
+        
+        return currentY
+    }
+    
+    // 构建媒体信息字符串
+    private func buildMediaInfoString(entry: MoodEntry) -> String {
+        var mediaInfo: [String] = []
+        if entry.audioURL != nil {
+            mediaInfo.append("包含语音")
+        }
+        if entry.imageURL != nil {
+            mediaInfo.append("包含图片")
+        }
+        return mediaInfo.isEmpty ? "" : "媒体: \(mediaInfo.joined(separator: "、"))"
+    }
+    
+    // 获取用户显示名称
+    private func getUserDisplayName() -> String {
+        var displayName = "心情日记用户"
+        
+        if let gender = userProfile.gender {
+            if let age = userProfile.age {
+                displayName = "\(age)岁\(gender.displayName)"
+            } else {
+                displayName = gender.displayName
+            }
+        }
+        
+        print("👤 生成用户显示名称: \(displayName)")
+        return displayName
     }
     
     // 计算数据统计摘要
